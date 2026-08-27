@@ -1,0 +1,15 @@
+data/
+paper_figs/
+*__pycache__/
+.vscode/
+outputs/
+
+*.tex
+
+# Local experiment artifacts
+/data/
+/outputs*/
+*.log
+__pycache__/
+*.pyc
+.idea/
