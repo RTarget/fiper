@@ -1,0 +1,35 @@
+name: tac_fiper_strict
+
+tasks:
+  large:
+    - sorting
+    - stacking
+    - push_t
+
+  small:
+    - pretzel
+    - push_chair
+
+large_task_protocol:
+  calibration_success_for_representation: 30
+  calibration_success_for_conformal: 20
+  exclude_calibration_failures: true
+
+small_task_protocol:
+  use_shared_representation_encoder: true
+  split_calibration: false
+  use_for_conformal_calibration: true
+
+push_t_protocol:
+  successful_calibration_only: true
+  failed_calibration_for_representation: false
+  failed_calibration_for_conformal: false
+  failed_calibration_for_hyperparameter_selection: false
+  preserve_original_baseline_split: true
+
+data_leakage_rules:
+  split_unit: rollout
+  use_test_for_training: false
+  use_test_for_hyperparameter_selection: false
+  use_test_for_epoch_selection: false
+
