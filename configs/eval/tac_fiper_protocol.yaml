@@ -1,35 +1,125 @@
-name: tac_fiper_strict
+name: tac_fiper_protocol
+version: 1
+status: draft
+
+data:
+  root: data
+  metadata: processed_rollouts/metadata.pkl
+  split_unit: rollout
+  rollout_identity: metadata_index
 
 tasks:
-  large:
-    - sorting
-    - stacking
-    - push_t
+  sorting:
+    expected:
+      calibration: {successful: 50, failed: 0}
+      test: {successful: 255, failed: 145}
+    tac:
+      allocation_status: unresolved
+      representation:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      selection:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      threshold:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
 
-  small:
-    - pretzel
-    - push_chair
+  stacking:
+    expected:
+      calibration: {successful: 50, failed: 0}
+      test: {successful: 315, failed: 485}
+    tac:
+      allocation_status: unresolved
+      representation:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      selection:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      threshold:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
 
-large_task_protocol:
-  calibration_success_for_representation: 30
-  calibration_success_for_conformal: 20
-  exclude_calibration_failures: true
+  push_t:
+    expected:
+      calibration: {successful: 21, failed: 29}
+      test: {successful: 102, failed: 198}
+    tac:
+      allocation_status: unresolved
+      representation:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      selection:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      threshold:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
 
-small_task_protocol:
-  use_shared_representation_encoder: true
-  split_calibration: false
-  use_for_conformal_calibration: true
+  pretzel:
+    expected:
+      calibration: {successful: 10, failed: 0}
+      test: {successful: 10, failed: 10}
+    tac:
+      allocation_status: unresolved
+      representation:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      selection:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      threshold:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
 
-push_t_protocol:
-  successful_calibration_only: true
-  failed_calibration_for_representation: false
-  failed_calibration_for_conformal: false
-  failed_calibration_for_hyperparameter_selection: false
-  preserve_original_baseline_split: true
+  push_chair:
+    expected:
+      calibration: {successful: 10, failed: 0}
+      test: {successful: 10, failed: 10}
+    tac:
+      allocation_status: unresolved
+      representation:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      selection:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+      threshold:
+        source: successful_calibration
+        requested_rollouts: null
+        rollout_indices: []
+
+protocol_rules:
+  tac_successful_calibration_only: true
+  require_explicit_rollout_indices: true
+  require_disjoint_tac_roles: true
+  allow_unresolved_allocation_in_draft: true
+  allow_failed_calibration_for_representation: false
+  allow_failed_calibration_for_selection: false
+  allow_failed_calibration_for_threshold: false
+  allow_calibration_unused_auto_fill: false
+
+conformal:
+  method: unresolved
+  finite_sample_guarantee_claimed: false
 
 data_leakage_rules:
-  split_unit: rollout
   use_test_for_training: false
   use_test_for_hyperparameter_selection: false
   use_test_for_epoch_selection: false
-
+  use_test_for_threshold_selection: false
