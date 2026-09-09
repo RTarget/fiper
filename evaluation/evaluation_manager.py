@@ -162,22 +162,39 @@ class EvaluationManager:
         }
         threshold_styles = list(method1_results["calibration_thresholds"].keys())
 
-        comb_quantiles, test_metrics, test_scores_by_threshold = [], {}, {}
+        comb_quantiles = [
+            quantile1
+            if quantile1 == quantile2
+            else f"{quantile1}/{quantile2}"
+            for quantile1, quantile2 in zip(quantiles1, quantiles2)
+        ]
+        comb_window_sizes = [
+            window_size1
+            if window_size1 == window_size2
+            else f"{window_size1}/{window_size2}"
+            for window_size1, window_size2 in zip(
+                window_sizes1,
+                window_sizes2,
+            )
+        ]
+
+        test_metrics, test_scores_by_threshold = {}, {}
         for threshold_style in threshold_styles:
             test_metrics[threshold_style] = {}
             test_scores_by_threshold[threshold_style] = {}
-            for quantile1, quantile2 in zip(quantiles1, quantiles2):
-                comb_quantile = quantile1 if quantile1 == quantile2 else f"{quantile1}/{quantile2}"
-                comb_quantiles.append(comb_quantile)
+            for quantile1, quantile2, comb_quantile in zip(
+                quantiles1,
+                quantiles2,
+                comb_quantiles,
+            ):
                 test_metrics[threshold_style][comb_quantile] = {}
                 test_scores_by_threshold[threshold_style][comb_quantile] = {}
 
-                comb_window_sizes = []
-                for window_size1, window_size2 in zip(window_sizes1, window_sizes2):
-                    comb_window_size = (
-                        window_size1 if window_size1 == window_size2 else f"{window_size1}/{window_size2}"
-                    )
-                    comb_window_sizes.append(comb_window_size)
+                for window_size1, window_size2, comb_window_size in zip(
+                    window_sizes1,
+                    window_sizes2,
+                    comb_window_sizes,
+                ):
 
                     scores_by_threshold_m1 = method1_results["test_scores_by_threshold"][threshold_style][quantile1][
                         window_size1
