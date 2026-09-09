@@ -8,25 +8,67 @@ data:
   split_unit: rollout
   rollout_identity: metadata_index
 
+development_smoke:
+  purpose: pipeline_validation_only
+  task: sorting
+  allocation_seed: 20260909
+  use_test: false
+  report_performance: false
+  threshold:
+    style: ct_quantile
+    quantile: 0.9
+
 tasks:
   sorting:
     expected:
-      calibration: {successful: 50, failed: 0}
-      test: {successful: 255, failed: 145}
+      calibration: { successful: 50, failed: 0 }
+      test: { successful: 255, failed: 145 }
     tac:
-      allocation_status: unresolved
+      allocation_status: resolved
+      allocation_scope: development_smoke_only
+      allocation_seed: 20260909
       representation:
         source: successful_calibration
-        requested_rollouts: null
-        rollout_indices: []
+        requested_rollouts: 30
+        rollout_indices:
+          - 0
+          - 1
+          - 7
+          - 8
+          - 9
+          - 11
+          - 13
+          - 16
+          - 20
+          - 22
+          - 23
+          - 24
+          - 25
+          - 28
+          - 29
+          - 30
+          - 32
+          - 34
+          - 35
+          - 36
+          - 37
+          - 38
+          - 39
+          - 40
+          - 41
+          - 42
+          - 44
+          - 45
+          - 46
+          - 49
       selection:
         source: successful_calibration
-        requested_rollouts: null
-        rollout_indices: []
+        requested_rollouts: 10
+        rollout_indices: [ 3, 6, 10, 12, 21, 27, 31, 43, 47, 48 ]
       threshold:
         source: successful_calibration
-        requested_rollouts: null
-        rollout_indices: []
+        requested_rollouts: 10
+        rollout_indices: [ 2, 4, 5, 14, 15, 17, 18, 19, 26, 33 ]
 
   stacking:
     expected:

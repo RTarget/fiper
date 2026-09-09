@@ -296,6 +296,75 @@ def validate_task(
 
     return errors, unresolved
 
+def validate_development_smoke(
+    config: dict,
+    tasks: dict,
+    errors: list[str],
+) -> None:
+    smoke = config.get("development_smoke")
+    if smoke is None:
+        return
+    if not isinstance(smoke, dict):
+        errors.append("development_smoke must be a mapping")
+        return
+
+    if smoke.get("purpose") != "pipeline_validation_only":
+        errors.append(
+            "development_smoke.purpose must be "
+            "'pipeline_validation_only'"
+        )
+    if smoke.get("use_test") is not False:
+        errors.append("development_smoke.use_test must be false")
+    if smoke.get("report_performance") is not False:
+        errors.append(
+            "development_smoke.report_performance must be false"
+        )
+
+    threshold = smoke.get("threshold")
+    if not isinstance(threshold, dict):
+        errors.append("development_smoke.threshold must be a mapping")
+    else:
+        if threshold.get("style") != "ct_quantile":
+            errors.append(
+                "development_smoke.threshold.style must be 'ct_quantile'"
+            )
+        if threshold.get("quantile") != 0.9:
+            errors.append(
+                "development_smoke.threshold.quantile must be 0.9"
+            )
+
+    task = smoke.get("task")
+    if task not in tasks:
+        errors.append(
+            f"development_smoke task is not configured: {task!r}"
+        )
+        return
+
+    task_tac = tasks[task].get("tac", {})
+    if task_tac.get("allocation_status") != "resolved":
+        errors.append(
+            f"{task}: development smoke allocation must be resolved"
+        )
+    if task_tac.get("allocation_scope") != "development_smoke_only":
+        errors.append(
+            f"{task}: allocation_scope must be "
+            "'development_smoke_only'"
+        )
+
+    smoke_seed = smoke.get("allocation_seed")
+    task_seed = task_tac.get("allocation_seed")
+    if (
+        isinstance(smoke_seed, bool)
+        or not isinstance(smoke_seed, Integral)
+    ):
+        errors.append(
+            "development_smoke.allocation_seed must be an integer"
+        )
+    elif smoke_seed != task_seed:
+        errors.append(
+            f"{task}: development smoke allocation seeds do not match"
+        )
+
 
 def validate_config(
     config_path: Path,
@@ -382,6 +451,9 @@ def validate_config(
     if not isinstance(tasks, dict) or not tasks:
         errors.append("tasks must be a non-empty mapping")
         tasks = {}
+
+    validate_development_smoke(config, tasks, errors)
+
 
     unknown_tasks = set(selected_tasks or ()) - set(tasks)
     for task in sorted(unknown_tasks):

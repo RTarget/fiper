@@ -224,6 +224,46 @@ class TacProtocolTest(unittest.TestCase):
         self.assertEqual(result, 1)
         self.assertIn("use_test_for_training must be false", output)
 
+    def make_development_smoke_config(self):
+        config = copy.deepcopy(self.config)
+        task_tac = config["tasks"]["sorting"]["tac"]
+        task_tac["allocation_scope"] = "development_smoke_only"
+        task_tac["allocation_seed"] = 20260909
+
+        config["development_smoke"] = {
+            "purpose": "pipeline_validation_only",
+            "task": "sorting",
+            "allocation_seed": 20260909,
+            "use_test": False,
+            "report_performance": False,
+            "threshold": {
+                "style": "ct_quantile",
+                "quantile": 0.9,
+            },
+        }
+        return config
+
+    def test_valid_development_smoke_config_passes(self):
+        config = self.make_development_smoke_config()
+        self.write_config(config)
+
+        result, output = self.run_validation(require_resolved=True)
+
+        self.assertEqual(result, 0)
+        self.assertIn("METADATA VALIDATION PASSED", output)
+
+    def test_rejects_test_use_in_development_smoke(self):
+        config = self.make_development_smoke_config()
+        config["development_smoke"]["use_test"] = True
+        self.write_config(config)
+
+        result, output = self.run_validation(require_resolved=True)
+
+        self.assertEqual(result, 1)
+        self.assertIn(
+            "development_smoke.use_test must be false",
+            output,
+        )
 
 if __name__ == "__main__":
     unittest.main()
