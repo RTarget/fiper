@@ -584,25 +584,101 @@ class ProcessedRolloutDataset(Dataset):
         return tensor.shape
 
     def _filter_start_end_episode_indices(
-        self, subset: str = "all", subsubset: str = "all", during_init=False
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Returns the episode start and end indices and successlabels given a subset and subsubset."""
+            self,
+            subset: str = "all",
+            subsubset: str = "all",
+            rollout_indices: Optional[Union[list, np.ndarray]] = None,
+            during_init=False,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return episode boundaries and labels for a filtered rollout set.
+
+        ``rollout_indices`` contains global metadata rollout indices. When
+        provided, every index must belong to the requested subset/subsubset.
+        """
+
         if not during_init:
             self._assert_dataset_loaded()
             self._assert_subset(subset=subset)
             self._assert_subsubset(subsubset=subsubset)
             self._assert_metadata()
+
         metadata = self.data["metadata"]
-        start_indices = metadata["episode_start_indices"]
-        end_indices = metadata["episode_end_indices"]
+        start_indices = np.asarray(metadata["episode_start_indices"])
+        end_indices = np.asarray(metadata["episode_end_indices"])
 
         mask = np.ones(len(start_indices), dtype=bool)
-        mask = mask & metadata[subset + "_rollout_labels"] if subset != "all" else mask
-        mask = mask & metadata[subsubset + "_rollout_labels"] if subsubset != "all" else mask
+        if subset != "all":
+            mask &= np.asarray(
+                metadata[subset + "_rollout_labels"],
+                dtype=bool,
+            )
+        if subsubset != "all":
+            mask &= np.asarray(
+                metadata[subsubset + "_rollout_labels"],
+                dtype=bool,
+            )
+
+        if rollout_indices is not None:
+            try:
+                values = list(rollout_indices)
+            except TypeError as exc:
+                raise ValueError(
+                    "rollout_indices must be an iterable of integers"
+                ) from exc
+
+            invalid_types = [
+                value
+                for value in values
+                if isinstance(value, (bool, np.bool_))
+                   or not isinstance(value, (int, np.integer))
+            ]
+            if invalid_types:
+                raise ValueError(
+                    "rollout_indices must contain only integer indices; "
+                    f"invalid values: {invalid_types!r}"
+                )
+
+            selected_indices = np.asarray(values, dtype=np.int64)
+            if len(np.unique(selected_indices)) != len(selected_indices):
+                raise ValueError("rollout_indices must not contain duplicates")
+
+            if np.any(selected_indices < 0) or np.any(
+                    selected_indices >= len(start_indices)
+            ):
+                raise ValueError("rollout_indices contains an out-of-range index")
+
+            if subset != "all":
+                subset_values = np.asarray(
+                    metadata[subset + "_rollout_labels"],
+                    dtype=bool,
+                )
+                if not np.all(subset_values[selected_indices]):
+                    raise ValueError(
+                        "rollout_indices contains a rollout outside "
+                        f"subset={subset!r}"
+                    )
+
+            if subsubset != "all":
+                subsubset_values = np.asarray(
+                    metadata[subsubset + "_rollout_labels"],
+                    dtype=bool,
+                )
+                if not np.all(subsubset_values[selected_indices]):
+                    raise ValueError(
+                        "rollout_indices contains a rollout outside "
+                        f"subsubset={subsubset!r}"
+                    )
+
+            explicit_mask = np.zeros(len(start_indices), dtype=bool)
+            explicit_mask[selected_indices] = True
+            mask &= explicit_mask
 
         start_indices = start_indices[mask]
         end_indices = end_indices[mask]
-        success_labels = metadata["successful_rollout_labels"][mask]
+        success_labels = np.asarray(
+            metadata["successful_rollout_labels"],
+            dtype=bool,
+        )[mask]
 
         return start_indices, end_indices, success_labels
 
@@ -647,6 +723,7 @@ class ProcessedRolloutDataset(Dataset):
         with_success_labels: bool = False,
         normalize_tensors: Union[bool, dict] = None,
         history: int = 0,
+            rollout_indices: Optional[Union[list, np.ndarray]] = None,
         **kwargs: Optional[dict],
     ):
         """Iterate over episodes in the dataset. Returns the data for the specified subset of episodes and the specified tensors.
@@ -668,8 +745,12 @@ class ProcessedRolloutDataset(Dataset):
         self._assert_subset(subset=subset)
         self._assert_subsubset(subsubset=subsubset)
         self._assert_dataset_entries(dataset_entries=required_tensors)
-        start_indices, end_indices, success_labels = self._filter_start_end_episode_indices(
-            subset=subset, subsubset=subsubset
+        start_indices, end_indices, success_labels = (
+            self._filter_start_end_episode_indices(
+                subset=subset,
+                subsubset=subsubset,
+                rollout_indices=rollout_indices,
+            )
         )
         episode_lengths = end_indices - start_indices
         action_indices = self._get_action_slices(required_actions=required_actions, optional_actions=optional_actions)
@@ -712,6 +793,7 @@ class ProcessedRolloutDataset(Dataset):
         normalize_tensors: Union[bool, dict] = None,
         with_metadata: bool = False,
         history: int = 0,
+        rollout_indices: Optional[Union[list, np.ndarray]] = None,
         **kwargs: Optional[dict],
     ) -> Union[Dict[str, Any], list]:
         """Returns the data for the specified subset of episodes and the specified tensors.
@@ -733,8 +815,12 @@ class ProcessedRolloutDataset(Dataset):
         self._assert_subsubset(subsubset=subsubset)
         self._assert_dataset_entries(dataset_entries=checked_tensors)
         self._assert_dataset_loaded()
-        start_indices, end_indices, success_labels = self._filter_start_end_episode_indices(
-            subset=subset, subsubset=subsubset
+        start_indices, end_indices, success_labels = (
+            self._filter_start_end_episode_indices(
+                subset=subset,
+                subsubset=subsubset,
+                rollout_indices=rollout_indices,
+            )
         )
         slices = self._get_slices_from_indices(start_indices, end_indices)
 
