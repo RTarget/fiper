@@ -33,6 +33,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", type=Path, default=Path.cwd())
     parser.add_argument("--report", type=Path, default=Path("/tmp/tac_a0_cpu_check.json"))
+    parser.add_argument("--train-output", type=Path, default=None,
+                        help="Opt in to two CPU epochs; requires a NEW output directory")
     args = parser.parse_args()
     repo = args.repo.resolve()
     require((repo / "datasets/tac_fiper_a0.py").is_file(), "Run from the fiper repository root")
@@ -50,6 +52,11 @@ def main():
     torch.set_num_threads(2)
     torch.manual_seed(20260909)
     root = repo / "data/sorting"
+    if args.train_output is not None:
+        training_path = args.train_output.resolve()
+        require(not training_path.is_relative_to((repo / "data").resolve()),
+                "Training output must be outside original data")
+        require(not training_path.exists(), "Training output directory already exists; choose a new one")
     report_path = args.report.resolve()
     require(not report_path.is_relative_to((repo / "data").resolve()),
             "Report must be outside the original data directory")
@@ -222,6 +229,9 @@ def main():
     print(f"actions: raw=3, A0=6, original_metadata_action_dim={original_action_dim}, ts={ts}")
     print("PASS: calibration_files=50, test_payload_files=0, device=cpu, training=none")
     print(f"report: {report_path}")
+    if args.train_output is not None:
+        from evaluation.tac_fiper_a0_training import run_cpu_smoke
+        run_cpu_smoke(source, training_path, report)
 
 
 if __name__ == "__main__":

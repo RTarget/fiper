@@ -152,3 +152,22 @@ columns through the existing iterator. Only the verifier's in-memory
 action_dim is set to 6; saved metadata and baseline behavior are unchanged.
 This is an explicit A0 input choice, not a claim of numerical equivalence
 to the saved processed tensors or a fair baseline comparison already done.
+
+## CPU Training Smoke
+
+Run `python scripts/verify_sorting_a0_cpu.py --train-output /tmp/NEW_DIRECTORY`
+with CUDA_VISIBLE_DEVICES empty. The default verifier remains forward-only.
+The training option uses two full CPU epochs, seed 20260909, batch size 32,
+Adam at 1e-3, gradient clipping at 1.0, and a small d_model=32, one-layer,
+four-head Transformer with dropout=0. Only representation updates parameters;
+sample-weighted selection BCE selects the checkpoint (earlier epoch wins ties).
+No loss improvement is required for a pipeline PASS.
+
+The selected model and frozen normalization are saved and restored on CPU.
+Reloaded selection loss and first-batch outputs must match. Only then are
+threshold samples constructed and scored using softplus(-logit). Window=1
+ct_quantile is the ordinary linear q=0.9 quantile of the ten rollout maxima,
+not a pooled timestep quantile or a finite-sample conformal guarantee.
+Artifacts are best.pt, threshold_scores.json and manifest.json in a new
+directory. The manifest records configuration, losses, roles and provenance.
+These artifacts are pipeline checks, not failure-detection performance.
