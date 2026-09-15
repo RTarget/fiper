@@ -44,8 +44,18 @@ For a timestep history from one successful representation rollout:
 - The negative example keeps the observation history fixed and applies a
   deterministic one-step action-history shift within the same rollout.
 
-The shifted action must never be taken from another rollout. This preserves
-the marginal action distribution while breaking temporal alignment.
+The shifted action must never be taken from another rollout. Specifically,
+rotate the valid action-history positions right by one within the current
+window, keeping padding fixed. Do not rotate an entire episode or read
+outside the current history. This preserves the action values in the window
+while breaking their temporal alignment. Repeated/constant actions may still
+produce identical negatives; A0 does not claim all synthetic pairs are separable.
+
+Representation and selection both contain balanced aligned/shifted pairs.
+At t=0 there is only one valid history position, so omit both members of that
+pair. Threshold contains aligned samples at every timestep, including t=0.
+A role containing only one-step rollouts has no train/selection pairs and
+must fail explicitly. No success/failure label is used as the BCE target.
 
 The current scalar output is interpreted as a consistency logit `z`.
 
@@ -76,6 +86,23 @@ The pipeline must use the existing `ProcessedRolloutDataset` interface:
 
 The implementation must not call `subset="test"` and must not infer roles
 from filenames. Metadata rollout indices are the only valid identity.
+
+The constructor milestone is `datasets/tac_fiper_a0.py::SortingA0Dataset`:
+pass an already loaded raw `ProcessedRolloutDataset`, a role, and `task="sorting"`.
+Its fixed role indices mirror this design and the sorting smoke YAML. It
+validates metadata before requesting selected episode tensors and passes
+an explicit false normalization dictionary to the existing iterator.
+It never loads files, fits statistics, calls the baseline normalizer, or
+accesses test tensor slices. The source may already hold test tensors in
+memory; controlling physical file reads belongs to the later loading stage.
+Feature normalization and the CPU trainer remain separate future steps.
+
+Samples contain float32 `obs_embeddings=[8,D]`, `action_preds=[8,S,P,A]`,
+bool `padding_mask=[8]` (True means padding), a scalar float32 `target`,
+and global `rollout_index` / episode-local `timestep` for audit and scoring.
+`make_a0_dataloader` uses CPU, zero workers, and a private seeded generator;
+only representation is shuffled. The constructor rejects non-CPU,
+non-floating, non-finite, or incorrectly shaped inputs.
 
 ## Role Contracts
 
