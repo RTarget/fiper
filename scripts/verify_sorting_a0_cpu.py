@@ -42,7 +42,8 @@ def main():
     import torch
     import yaml
     from datasets.rollout_datasets import ProcessedRolloutDataset
-    from datasets.tac_fiper_a0 import ROLE_INDICES, _validate_metadata, make_a0_dataloader
+    from datasets.tac_fiper_a0 import ROLE_INDICES, SortingA0Dataset, _validate_metadata, make_a0_dataloader
+    from datasets.tac_fiper_a0_normalization import A0FeatureNormalizer
     from evaluation.temporal_models import ObservationActionTemporalModel
     from tasks.task_manager import TaskManager
 
@@ -160,6 +161,13 @@ def main():
     for method in ("normalize", "_save_dataset", "load_dataset", "init_dataset"):
         setattr(source, method, forbidden)
 
+    representation = SortingA0Dataset(source, "representation", task="sorting")
+    normalizer = A0FeatureNormalizer.fit(representation)
+    norm_state = normalizer.state_dict()
+    restored_normalizer = A0FeatureNormalizer.from_state_dict(norm_state)
+    print(f"normalization: representation_only, obs_rows={norm_state['obs_count']}, "
+          f"action_rows={norm_state['action_count']}")
+
     model = ObservationActionTemporalModel(
         obs_dim=128, action_horizon=8, action_dim=6, d_model=16,
         nhead=2, num_layers=1, dim_feedforward=32,
@@ -170,7 +178,11 @@ def main():
         lengths = metadata["episode_lengths"][list(indices)]
         expected_count = int(lengths.sum()) if role == "threshold" else int(2 * (lengths - 1).sum())
         require(len(loader.dataset) == expected_count, f"{role}: incorrect sample count")
-        batch = next(iter(loader))
+        raw_batch = next(iter(loader))
+        batch = normalizer.transform(raw_batch)
+        restored_batch = restored_normalizer.transform(raw_batch)
+        for key in ("obs_embeddings", "action_preds"):
+            require(torch.equal(batch[key], restored_batch[key]), "Normalization state reload mismatch")
         require(tuple(batch["action_preds"].shape[1:]) == (8, 32, 8, 6),
                 "Iterator truncated augmented action columns")
         with torch.no_grad():
@@ -182,11 +194,19 @@ def main():
                          "indices": list(indices), "first_batch_forward_finite": True}
         print(f"{role}: rollouts={len(indices)}, samples={len(loader.dataset)}, forward=OK")
 
+    for key in ("obs_mean", "obs_scale", "action_mean", "action_scale"):
+        require(torch.equal(norm_state[key], normalizer.state_dict()[key]), "Frozen statistics changed")
     commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo, text=True).strip()
+    dirty = subprocess.check_output(["git", "status", "--porcelain"], cwd=repo, text=True).strip()
     report = {
         "status": "PASS", "scope": "real_calibration_constructor_and_first_batch_forward_only",
         "commit": commit, "device": "cpu", "seed": 20260909, "history": 8,
-        "normalization": "none", "model": "random_untrained_small_backbone",
+        "working_tree_dirty": bool(dirty),
+        "normalization": {"fit_role": "representation", "obs_count": norm_state["obs_count"],
+                          "action_count": norm_state["action_count"],
+                          "rollout_indices": norm_state["rollout_indices"],
+                          "frozen": True, "state_reload_equal": True},
+        "model": "random_untrained_small_backbone",
         "integration_ts": ts, "position_origin": "zero_no_states",
         "raw_action_shape": [32, 8, 3], "a0_action_shape": [32, 8, 6],
         "original_metadata_action_dim": original_action_dim, "in_memory_action_dim": 6,

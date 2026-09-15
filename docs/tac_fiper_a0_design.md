@@ -129,3 +129,26 @@ selector, and threshold fitter.
 - All losses and scores are finite.
 - A checkpoint can be saved and reloaded.
 - Selection loss alone determines the selected checkpoint.
+
+## Frozen Feature Normalization
+
+`A0FeatureNormalizer.fit` accepts only the fixed representation dataset.
+It reads original episode tensors once, including t=0, without padded
+windows or duplicated positive/negative examples. Observation statistics
+are per embedding feature over original timesteps. Action statistics are
+per action channel over original timesteps, samples, and predicted horizon.
+Use population standard deviation, float64 moment accumulation, and float32
+stored parameters. Channels with std below 1e-6 use scale 1.
+
+Transform uses `(x - mean) / scale` before the model's action mean/std
+summary, then resets masked positions to zero. It never updates statistics.
+Selection and threshold reuse these same frozen parameters. State exports
+include fitting indices and row counts and can be stored in a checkpoint.
+
+The real-data verifier uses a calibration-only in-memory view with all six
+action columns: raw velocity plus its zero-origin integrated displacement.
+The original metadata action_dim was 3, which would truncate augmented
+columns through the existing iterator. Only the verifier's in-memory
+action_dim is set to 6; saved metadata and baseline behavior are unchanged.
+This is an explicit A0 input choice, not a claim of numerical equivalence
+to the saved processed tensors or a fair baseline comparison already done.
