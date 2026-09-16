@@ -20,7 +20,10 @@ import pickle
 import subprocess
 import sys
 
-os.environ["CUDA_VISIBLE_DEVICES"] = ""
+# Preserve visibility only when GPU smoke is explicitly requested; validate UUID below.
+if "--gpu-uuid" not in sys.argv:
+    os.environ["CUDA_VISIBLE_DEVICES"] = ""
+os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 sys.dont_write_bytecode = True
 
 
@@ -35,7 +38,14 @@ def main():
     parser.add_argument("--report", type=Path, default=Path("/tmp/tac_a0_cpu_check.json"))
     parser.add_argument("--train-output", type=Path, default=None,
                         help="Opt in to two CPU epochs; requires a NEW output directory")
+    parser.add_argument("--gpu-uuid", default=None,
+                        help="Approved single-GPU UUID; requires matching CUDA_VISIBLE_DEVICES")
     args = parser.parse_args()
+    if args.gpu_uuid is not None:
+        require(args.train_output is not None, "GPU smoke requires --train-output")
+        require(args.gpu_uuid.startswith("GPU-")
+                and os.environ.get("CUDA_VISIBLE_DEVICES") == args.gpu_uuid,
+                "Set CUDA_VISIBLE_DEVICES to the same approved UUID as --gpu-uuid")
     repo = args.repo.resolve()
     require((repo / "datasets/tac_fiper_a0.py").is_file(), "Run from the fiper repository root")
     sys.path.insert(0, str(repo))
@@ -231,7 +241,7 @@ def main():
     print(f"report: {report_path}")
     if args.train_output is not None:
         from evaluation.tac_fiper_a0_training import run_cpu_smoke
-        run_cpu_smoke(source, training_path, report)
+        run_cpu_smoke(source, training_path, report, gpu_uuid=args.gpu_uuid)
 
 
 if __name__ == "__main__":
